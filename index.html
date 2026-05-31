@@ -249,12 +249,15 @@ let autoLearn=true, rec=null, current=null;
 // ---------- config ----------
 function loadCfg(){try{return JSON.parse(localStorage.getItem(LS_CFG))||{}}catch(e){return{}}}
 function saveCfg(){const c=loadCfg();
-  set(LS_CFG,{...c, key:$('#f-key').value.trim(), model:$('#f-model').value,
-    gmailClientId:($('#f-gmail-cid')?$('#f-gmail-cid').value.trim():(c.gmailClientId||''))});}
+  const key=($('#f-key')&&$('#f-key').value.trim())||c.key||'';
+  const model=($('#f-model')&&$('#f-model').value)||c.model||'claude-sonnet-4-6';
+  const gmailClientId=($('#f-gmail-cid')&&$('#f-gmail-cid').value.trim())||c.gmailClientId||'';
+  set(LS_CFG,{...c,key,model,gmailClientId});}
 (function init(){
   const c=loadCfg(); if(c.key)$('#f-key').value=c.key; if(c.model)$('#f-model').value=c.model;
   if(c.gmailClientId&&$('#f-gmail-cid'))$('#f-gmail-cid').value=c.gmailClientId;
   $('#f-date').value=new Date().toISOString().slice(0,10);
+  ['#f-key','#f-model','#f-gmail-cid'].forEach(s=>{const el=$(s);if(el)el.addEventListener('change',saveCfg);});
   renderPeople();
 })();
 
@@ -334,10 +337,7 @@ function buildPrefs(){
 function exportMemory(){
   const data={app:'atas',type:'memoria',version:1,exportedAt:new Date().toISOString(),
     termos:get(LS_TERMS),preferencias:get(LS_PREFS),participantes:get(LS_PEOPLE)};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob), a=document.createElement('a');
-  a.href=url; a.download='memoria-atas-'+new Date().toISOString().slice(0,10)+'.json';
-  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  dl(JSON.stringify(data,null,2),'application/json','memoria-atas-'+new Date().toISOString().slice(0,10)+'.json');
   memMsg('Memória exportada.','ok');
 }
 function importMemory(file){
@@ -748,7 +748,9 @@ function delItem(id){if(!confirm('Excluir esta ata?'))return;set(LS_ITEMS,get(LS
 // ---------- backup das atas ----------
 function dl(content,type,name){
   const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  a.href=url;a.download=name;a.target='_blank';a.rel='noopener';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
 function atasMsg(m,k){const s=$('#atas-status');if(s){s.className='status '+(k||'');s.textContent=m;}}
 function exportAtasJSON(){
