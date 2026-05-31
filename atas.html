@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6feb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Atas — gerador de atas</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --ink:#1a1f29; --muted:#6b7280;
+    --line:#e6e8eb; --brand:#1f6feb; --brand-d:#1a5fd0; --ok:#0f9d58;
+    --danger:#d23f3f; --chip:#eef2ff; --radius:14px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#0f1115;--card:#171a21;--ink:#e7e9ee;--muted:#9aa3b2;
+    --line:#262b35;--chip:#1d2230;}
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-text-size-adjust:100%}
+  .wrap{max-width:680px;margin:0 auto;padding:env(safe-area-inset-top) 14px 90px}
+  header{position:sticky;top:0;background:var(--bg);padding:14px 0 8px;z-index:20}
+  h1{font-size:20px;margin:0;display:flex;align-items:center;gap:8px}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--brand)}
+  .sub{color:var(--muted);font-size:12.5px;margin:2px 0 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px;margin:12px 0}
+  label{font-size:13px;font-weight:600;display:block;margin:0 0 6px}
+  .row{display:flex;gap:8px}
+  .row>div{flex:1}
+  input,textarea,select{width:100%;background:var(--bg);color:var(--ink);
+    border:1px solid var(--line);border-radius:10px;padding:10px 11px;font-size:15px;
+    font-family:inherit}
+  textarea{min-height:150px;resize:vertical;line-height:1.4}
+  textarea.edit{min-height:320px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px}
+  .hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+  button{font-family:inherit;font-size:15px;font-weight:600;border:0;border-radius:11px;
+    padding:12px 14px;cursor:pointer}
+  .btn{background:var(--brand);color:#fff;width:100%}
+  .btn:active{background:var(--brand-d)}
+  .btn[disabled]{opacity:.55;cursor:default}
+  .btn2{background:var(--chip);color:var(--ink);border:1px solid var(--line)}
+  .mic{flex:0 0 auto;width:50px;background:var(--chip);border:1px solid var(--line);color:var(--ink);font-size:18px}
+  .mic.rec{background:var(--danger);color:#fff;border-color:var(--danger);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.6}}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .actions button{flex:1;min-width:120px}
+  .tabs{display:flex;gap:6px;margin-top:6px}
+  .tab{flex:1;text-align:center;padding:9px 4px;border-radius:10px;background:transparent;
+    border:1px solid var(--line);color:var(--muted);font-weight:600;font-size:13.5px}
+  .tab.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  details summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+  .chip{background:var(--chip);border:1px solid var(--line);color:var(--ink);
+    border-radius:999px;padding:6px 11px;font-size:13px;cursor:pointer}
+  .chip:active{background:var(--brand);color:#fff}
+  .ata{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 16px 4px;margin-top:12px}
+  .ata h2{font-size:18px;margin:2px 0 8px}
+  .ata h3{font-size:14px;letter-spacing:.02em;text-transform:uppercase;color:var(--brand);
+    margin:16px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
+  .ata ul{margin:6px 0;padding-left:20px}
+  .ata li{margin:4px 0;line-height:1.45}
+  .ata p{line-height:1.5;margin:6px 0}
+  .list-item{display:flex;justify-content:space-between;align-items:center;gap:10px;
+    padding:11px 0;border-bottom:1px solid var(--line)}
+  .list-item:last-child{border-bottom:0}
+  .list-item .t{font-weight:600;font-size:15px}
+  .list-item .d{font-size:12.5px;color:var(--muted)}
+  .syn{font-size:13px;color:var(--ink);margin-top:4px;line-height:1.4}
+  .link{color:var(--brand);background:none;padding:6px;width:auto;font-size:13px}
+  .del{color:var(--danger);background:none;padding:6px;width:auto;font-size:13px}
+  .status{font-size:13px;margin-top:10px;min-height:18px}
+  .status.err{color:var(--danger)} .status.ok{color:var(--ok)} .status.run{color:var(--brand)}
+  .empty{color:var(--muted);text-align:center;padding:20px 0;font-size:14px}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--brand);
+    border-top-color:transparent;border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .learn{background:rgba(15,157,88,.10);border:1px solid rgba(15,157,88,.3);color:var(--ok);
+    border-radius:10px;padding:8px 11px;font-size:12.5px;margin-top:10px}
+  .conv{margin-top:10px}
+  .conv .u{font-size:13px;padding:7px 0;border-top:1px dashed var(--line);color:var(--ink)}
+  .conv .u b{color:var(--brand)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="dot"></span> Atas</h1>
+    <p class="sub">Gere a ata, peça ajustes ao Claude (texto ou voz) quantas vezes quiser, e envie.</p>
+    <div class="tabs">
+      <button class="tab on" id="tab-new" onclick="show('new')">Nova ata</button>
+      <button class="tab" id="tab-terms" onclick="show('terms')">Memória</button>
+      <button class="tab" id="tab-hist" onclick="show('hist')">Histórico</button>
+    </div>
+  </header>
+
+  <!-- NOVA ATA -->
+  <section id="view-new">
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <div><label>Título</label><input id="f-title" placeholder="Reunião com..."></div>
+        <div><label>Data</label><input id="f-date" type="date"></div>
+      </div>
+      <div class="row" style="margin-bottom:4px">
+        <div><label>Participantes</label><input id="f-people" placeholder="deixe vazio p/ detectar da transcrição"></div>
+        <div><label>Local</label><input id="f-place" placeholder="Online / Sala 2"></div>
+      </div>
+      <div class="hint">Toque num nome frequente para adicionar:</div>
+      <div class="chips" id="people-chips"></div>
+
+      <label style="margin-top:12px">Transcrição</label>
+      <textarea id="f-trans" placeholder="Cole aqui o texto transcrito da reunião (do Plaud)..."></textarea>
+      <div class="hint">O glossário e as preferências (aba Memória) são aplicados automaticamente.</div>
+
+      <details style="margin-top:12px">
+        <summary>Participantes frequentes (cadastro)</summary>
+        <div style="margin-top:10px">
+          <div class="row">
+            <div><input id="p-add" placeholder="Nome da pessoa"></div>
+            <div style="flex:0 0 auto"><button class="btn2" onclick="addPerson()">Adicionar</button></div>
+          </div>
+          <div id="people-manage"></div>
+        </div>
+      </details>
+
+      <details style="margin-top:10px">
+        <summary>Configurar IA (chave do Claude) — só na 1ª vez</summary>
+        <div style="margin-top:10px">
+          <label>Chave de API (sk-ant-...)</label>
+          <input id="f-key" type="password" placeholder="cole sua chave; fica salva só neste aparelho">
+          <label style="margin-top:10px">Modelo</label>
+          <select id="f-model">
+            <option value="claude-sonnet-4-6">Sonnet (equilíbrio) — recomendado</option>
+            <option value="claude-haiku-4-5-20251001">Haiku (mais barato/rápido)</option>
+            <option value="claude-opus-4-6">Opus (mais capaz/caro)</option>
+          </select>
+          <div class="hint">A chave nunca sai do seu celular além da chamada direta ao Claude.
+            Pegue em console.anthropic.com → API Keys. Se um modelo der erro, troque aqui.</div>
+        </div>
+      </details>
+
+      <button class="btn" id="gen" style="margin-top:14px" onclick="generate()">Gerar ata</button>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div id="result"></div>
+  </section>
+
+  <!-- MEMÓRIA (termos + preferências) -->
+  <section id="view-terms" style="display:none">
+    <div class="card">
+      <label>Glossário de termos do setor</label>
+      <div class="hint" style="margin:0 0 10px">
+        Grafia correta (ex.: SINDUSCON) e, opcional, como aparece errado na transcrição
+        (ex.: "sindscon, sin dus con"). O app também aprende termos sozinho quando você corrige uma ata.
+      </div>
+      <label>Termo correto</label>
+      <input id="t-term" placeholder="Ex.: SINDUSCON">
+      <label style="margin-top:8px">Como aparece errado (opcional, separado por vírgula)</label>
+      <input id="t-var" placeholder="sindscon, sin dus con">
+      <button class="btn" style="margin-top:10px" onclick="addTerm()">Adicionar termo</button>
+      <div id="terms-list" style="margin-top:6px"></div>
+    </div>
+
+    <div class="card">
+      <label>Preferências aprendidas (estilo/formato)</label>
+      <div class="hint" style="margin:0 0 10px">
+        O que você ensina ao corrigir as atas fica aqui e vale para as próximas (ex.: "Resumo em no máximo 3 frases").
+      </div>
+      <input id="pref-add" placeholder="ex.: Listar decisões antes das tarefas">
+      <button class="btn" style="margin-top:8px" onclick="addPref()">Adicionar preferência</button>
+      <div id="prefs-list" style="margin-top:6px"></div>
+    </div>
+
+    <div class="card">
+      <label>Backup da memória</label>
+      <div class="hint" style="margin:0 0 10px">
+        Salve um arquivo com glossário, preferências e participantes — para guardar ou levar a outro aparelho.
+        Ao importar, os itens são mesclados (sem apagar nem duplicar o que já existe).
+      </div>
+      <div class="actions" style="margin-top:0">
+        <button class="btn2" onclick="exportMemory()">⬇️ Exportar memória</button>
+        <button class="btn2" onclick="document.getElementById('mem-file').click()">⬆️ Importar memória</button>
+      </div>
+      <input type="file" id="mem-file" accept="application/json,.json" style="display:none"
+        onchange="importMemory(this.files[0]); this.value='';">
+      <div class="status" id="mem-status"></div>
+    </div>
+  </section>
+
+  <!-- HISTÓRICO -->
+  <section id="view-hist" style="display:none">
+    <div class="card">
+      <label>Pesquisar atas</label>
+      <input id="hist-q" placeholder="Por tema, título ou conteúdo..." oninput="renderHist()">
+      <div class="hint">Toque num tema para filtrar por ele.</div>
+      <div id="hist-list" style="margin-top:8px"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const LS_ITEMS='atas_items_v1', LS_CFG='atas_cfg_v1', LS_TERMS='atas_terms_v1',
+      LS_PEOPLE='atas_people_v1', LS_PREFS='atas_prefs_v1';
+const get=k=>{try{return JSON.parse(localStorage.getItem(k))||[]}catch(e){return[]}};
+const set=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+let autoLearn=true, rec=null, current=null;
+
+// ---------- config ----------
+function loadCfg(){try{return JSON.parse(localStorage.getItem(LS_CFG))||{}}catch(e){return{}}}
+function saveCfg(){set(LS_CFG,{key:$('#f-key').value.trim(),model:$('#f-model').value});}
+(function init(){
+  const c=loadCfg(); if(c.key)$('#f-key').value=c.key; if(c.model)$('#f-model').value=c.model;
+  $('#f-date').value=new Date().toISOString().slice(0,10);
+  renderPeople();
+})();
+
+// ---------- abas ----------
+function show(v){
+  for(const x of ['new','terms','hist']){
+    $('#view-'+x).style.display=v===x?'':'none';
+    $('#tab-'+x).classList.toggle('on',v===x);
+  }
+  if(v==='hist')renderHist();
+  if(v==='terms'){renderTerms();renderPrefs();}
+}
+
+// ---------- participantes ----------
+function renderPeople(){
+  const ppl=get(LS_PEOPLE);
+  $('#people-chips').innerHTML=ppl.length
+    ?ppl.map(p=>'<span class="chip" onclick="pickPerson(\''+esc(p).replace(/'/g,"\\'")+'\')">+ '+esc(p)+'</span>').join('')
+    :'<span class="hint">Nenhum participante cadastrado ainda.</span>';
+  $('#people-manage').innerHTML=ppl.map((p,i)=>
+    '<div class="list-item"><div class="t">'+esc(p)+'</div><button class="del" onclick="delPerson('+i+')">Remover</button></div>').join('');
+}
+function addPerson(){const v=$('#p-add').value.trim();if(!v)return;const a=get(LS_PEOPLE);
+  if(!a.includes(v))a.push(v);set(LS_PEOPLE,a);$('#p-add').value='';renderPeople();}
+function delPerson(i){const a=get(LS_PEOPLE);a.splice(i,1);set(LS_PEOPLE,a);renderPeople();}
+function pickPerson(name){const f=$('#f-people');
+  const cur=f.value.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!cur.includes(name))cur.push(name);f.value=cur.join(', ');}
+
+// ---------- termos ----------
+function renderTerms(){
+  const t=get(LS_TERMS),el=$('#terms-list');
+  if(!t.length){el.innerHTML='<div class="empty">Nenhum termo cadastrado.</div>';return;}
+  el.innerHTML=t.map((x,i)=>
+    '<div class="list-item"><div><div class="t">'+esc(x.term)+'</div>'+
+    (x.var?'<div class="d">ouvido como: '+esc(x.var)+'</div>':'')+
+    '</div><button class="del" onclick="delTerm('+i+')">Remover</button></div>').join('');
+}
+function addTerm(){const term=$('#t-term').value.trim();if(!term)return;
+  const a=get(LS_TERMS);a.push({term,var:$('#t-var').value.trim()});set(LS_TERMS,a);
+  $('#t-term').value='';$('#t-var').value='';renderTerms();}
+function delTerm(i){const a=get(LS_TERMS);a.splice(i,1);set(LS_TERMS,a);renderTerms();}
+function buildGlossary(){
+  const t=get(LS_TERMS);if(!t.length)return'';
+  const lines=t.map(x=>'- '+x.term+(x.var?' (pode aparecer errado como: '+x.var+')':'')).join('\n');
+  return `\nGlossário do setor — use a grafia EXATA destes termos e CORRIJA variações ouvidas erradas:\n${lines}\n`;
+}
+
+// ---------- preferências ----------
+function renderPrefs(){
+  const p=get(LS_PREFS),el=$('#prefs-list');
+  if(!p.length){el.innerHTML='<div class="empty">Nenhuma preferência ainda.</div>';return;}
+  el.innerHTML=p.map((x,i)=>
+    '<div class="list-item"><div class="t" style="font-weight:400">'+esc(x)+'</div><button class="del" onclick="delPref('+i+')">Remover</button></div>').join('');
+}
+function addPref(){const v=$('#pref-add').value.trim();if(!v)return;const a=get(LS_PREFS);
+  if(!a.includes(v))a.push(v);set(LS_PREFS,a);$('#pref-add').value='';renderPrefs();}
+function delPref(i){const a=get(LS_PREFS);a.splice(i,1);set(LS_PREFS,a);renderPrefs();}
+function buildPrefs(){
+  const p=get(LS_PREFS);if(!p.length)return'';
+  return `\nPreferências duráveis do usuário (sempre siga):\n${p.map(x=>'- '+x).join('\n')}\n`;
+}
+
+// ---------- backup da memória ----------
+function exportMemory(){
+  const data={app:'atas',type:'memoria',version:1,exportedAt:new Date().toISOString(),
+    termos:get(LS_TERMS),preferencias:get(LS_PREFS),participantes:get(LS_PEOPLE)};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download='memoria-atas-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  memMsg('Memória exportada.','ok');
+}
+function importMemory(file){
+  if(!file)return;
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const d=JSON.parse(fr.result);
+      if(d.type&&d.type!=='memoria') throw new Error('arquivo não é uma memória de atas');
+      let nt=0,np=0,npl=0;
+      // termos (dedupe por term, case-insensitive)
+      if(Array.isArray(d.termos)){const t=get(LS_TERMS);
+        d.termos.forEach(x=>{if(x&&x.term&&!t.some(e=>e.term.toLowerCase()===String(x.term).toLowerCase())){
+          t.push({term:x.term,var:x.var||''});nt++;}});set(LS_TERMS,t);}
+      // preferências
+      if(Array.isArray(d.preferencias)){const p=get(LS_PREFS);
+        d.preferencias.forEach(x=>{if(x&&!p.includes(x)){p.push(x);np++;}});set(LS_PREFS,p);}
+      // participantes
+      if(Array.isArray(d.participantes)){const pe=get(LS_PEOPLE);
+        d.participantes.forEach(x=>{if(x&&!pe.includes(x)){pe.push(x);npl++;}});set(LS_PEOPLE,pe);}
+      renderTerms();renderPrefs();renderPeople();
+      memMsg(`Importado: +${nt} termos, +${np} preferências, +${npl} participantes.`,'ok');
+    }catch(e){memMsg('Não foi possível importar: '+e.message,'err');}
+  };
+  fr.onerror=()=>memMsg('Falha ao ler o arquivo.','err');
+  fr.readAsText(file);
+}
+function memMsg(m,kind){const s=$('#mem-status');if(s){s.className='status '+(kind||'');s.textContent=m;}}
+
+// ---------- prompts ----------
+function genSystem(){
+  return `Você cria e edita ATAS de reunião em português do Brasil a partir de transcrições geradas por IA (com erros).
+
+Formato da ata (Markdown, exatamente nesta ordem):
+## [Título da reunião]
+**Data:** [data]  ·  **Local:** [local]
+**Participantes:** [lista]
+
+### Resumo
+[parágrafo curto e objetivo]
+
+### Decisões
+- [decisão]
+
+### Tarefas / Ações
+- [Ação] — **Responsável:** [nome] — **Prazo:** [data ou "a definir"]
+
+Regras: use só dados da transcrição; não invente nomes, números nem datas; identifique participantes pela fala/citação; corrija grafias pelo glossário; seja conciso.
+${buildGlossary()}${buildPrefs()}
+Quando o usuário pedir alterações, devolva SEMPRE a ata COMPLETA e atualizada (não só o trecho mudado).
+
+Responda SEMPRE exatamente neste formato, com os marcadores em linhas próprias:
+<<<ATA>>>
+(a ata completa em Markdown)
+<<<APRENDIZADOS>>>
+(um JSON: {"termos":[{"term":"","var":""}],"preferencias":[""]} — liste APENAS correções de termos e regras de estilo/formato duráveis que valham para próximas atas; listas vazias se não houver)`;
+}
+function buildUserGen(){
+  const t=$('#f-title').value.trim(), d=$('#f-date').value, p=$('#f-people').value.trim(),
+        l=$('#f-place').value.trim(), tr=$('#f-trans').value.trim();
+  const roster=get(LS_PEOPLE);
+  return `Crie a ata a partir desta transcrição.
+Título: ${t||'(deduzir)'}
+Data: ${d||'(deduzir)'}
+Participantes informados: ${p||'(deduzir da transcrição)'}
+Local: ${l||'(deduzir)'}
+${roster.length?'Participantes frequentes conhecidos: '+roster.join(', ')+'.':''}
+
+Transcrição:
+"""
+${tr}
+"""`;
+}
+
+// ---------- API ----------
+async function callApi(system,messages,model,key){
+  const r=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'content-type':'application/json','x-api-key':key,
+      'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model,max_tokens:2500,system,messages})
+  });
+  if(!r.ok){const e=await r.text();throw new Error('API '+r.status+': '+e.slice(0,200));}
+  const data=await r.json();
+  const txt=(data.content||[]).map(b=>b.text||'').join('').trim();
+  if(!txt)throw new Error('Resposta vazia do modelo.');
+  return txt;
+}
+function parseResponse(raw){
+  let ata=raw, learn=null;
+  const MA='<<<ATA>>>', ML='<<<APRENDIZADOS>>>';
+  const a=raw.indexOf(MA), l=raw.indexOf(ML);
+  if(a>=0&&l>a){
+    ata=raw.slice(a+MA.length,l).trim();
+    let js=raw.slice(l+ML.length).trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+    try{learn=JSON.parse(js);}catch(e){learn=null;}
+  }else if(a>=0){ata=raw.slice(a+MA.length).trim();}
+  return {ata,learn};
+}
+function mergeLearnings(learn){
+  if(!autoLearn||!learn)return'';
+  const msgs=[];
+  if(Array.isArray(learn.termos)){
+    const t=get(LS_TERMS);
+    learn.termos.forEach(x=>{if(x&&x.term&&!t.some(e=>e.term.toLowerCase()===x.term.toLowerCase())){
+      t.push({term:x.term,var:x.var||''});msgs.push('termo “'+x.term+'”');}});
+    set(LS_TERMS,t);
+  }
+  if(Array.isArray(learn.preferencias)){
+    const p=get(LS_PREFS);
+    learn.preferencias.forEach(x=>{if(x&&!p.includes(x)){p.push(x);msgs.push('preferência “'+x+'”');}});
+    set(LS_PREFS,p);
+  }
+  return msgs.length?('💡 Aprendi: '+msgs.join(', ')):'';
+}
+
+// ---------- gerar ----------
+async function generate(){
+  const key=$('#f-key').value.trim(), model=$('#f-model').value, tr=$('#f-trans').value.trim();
+  const st=$('#status'); st.className='status';
+  if(!tr){st.className='status err';st.textContent='Cole a transcrição primeiro.';return;}
+  if(!key){st.className='status err';st.textContent='Falta a chave de API — abra "Configurar IA".';return;}
+  saveCfg();
+  $('#gen').disabled=true; st.className='status run'; st.innerHTML='<span class="spin"></span>Gerando ata...';
+  try{
+    const thread=[{role:'user',content:buildUserGen()}];
+    const raw=await callApi(genSystem(),thread,model,key);
+    thread.push({role:'assistant',content:raw});
+    const {ata,learn}=parseResponse(raw);
+    current={md:ata,title:titleFromMd(ata),date:$('#f-date').value,thread,log:[]};
+    renderResultShell(true);
+    const lm=mergeLearnings(learn);
+    st.className='status ok'; st.textContent='Pronto. Peça ajustes abaixo se precisar.';
+    if(lm)setLearn(lm);
+    $('#result').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(err){
+    st.className='status err';
+    st.textContent='Erro: '+err.message+(/Failed to fetch/.test(err.message)?' (rede/CORS — verifique conexão e chave)':'');
+  }finally{$('#gen').disabled=false;}
+}
+
+// ---------- refinar (texto/voz) ----------
+async function refine(){
+  const inp=$('#refine-input'), txt=inp.value.trim();
+  if(!txt||!current)return;
+  const cfg=loadCfg(), key=cfg.key||$('#f-key').value.trim(), model=cfg.model||'claude-sonnet-4-6';
+  const rs=$('#refine-status'); rs.className='status';
+  if(!key){rs.className='status err';rs.textContent='Falta a chave de API.';return;}
+  current.thread.push({role:'user',content:txt});
+  $('#refine-btn').disabled=true; rs.className='status run'; rs.innerHTML='<span class="spin"></span>Atualizando...';
+  try{
+    const raw=await callApi(genSystem(),current.thread,model,key);
+    current.thread.push({role:'assistant',content:raw});
+    const {ata,learn}=parseResponse(raw);
+    current.md=ata; current.title=titleFromMd(ata);
+    renderAtaBox();
+    current.log.push(txt); renderConv();
+    inp.value='';
+    const lm=mergeLearnings(learn);
+    rs.className='status ok'; rs.textContent=lm||'Ata atualizada.';
+    if(lm)setLearn(lm);
+  }catch(err){
+    current.thread.pop();
+    rs.className='status err'; rs.textContent='Erro: '+err.message;
+  }finally{$('#refine-btn').disabled=false;}
+}
+
+// ---------- voz ----------
+function micToggle(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const btn=$('#mic');
+  if(!SR){$('#refine-status').className='status err';$('#refine-status').textContent='Reconhecimento de voz indisponível neste navegador — use o teclado.';return;}
+  if(rec){rec.stop();return;}
+  rec=new SR(); rec.lang='pt-BR'; rec.interimResults=true; rec.continuous=false;
+  const base=$('#refine-input').value;
+  btn.classList.add('rec'); btn.textContent='⏹';
+  rec.onresult=e=>{let s='';for(let i=0;i<e.results.length;i++)s+=e.results[i][0].transcript;
+    $('#refine-input').value=(base?base+' ':'')+s;};
+  rec.onerror=()=>{};
+  rec.onend=()=>{rec=null;btn.classList.remove('rec');btn.textContent='🎤';};
+  rec.start();
+}
+
+// ---------- markdown ----------
+function mdToHtml(md){
+  const inline=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  const lines=md.split('\n');let html='',inList=false;
+  const closeList=()=>{if(inList){html+='</ul>';inList=false;}};
+  for(let ln of lines){
+    if(/^###\s+/.test(ln)){closeList();html+='<h3>'+inline(ln.replace(/^###\s+/,''))+'</h3>';}
+    else if(/^##\s+/.test(ln)){closeList();html+='<h2>'+inline(ln.replace(/^##\s+/,''))+'</h2>';}
+    else if(/^[-*]\s+/.test(ln)){if(!inList){html+='<ul>';inList=true;}html+='<li>'+inline(ln.replace(/^[-*]\s+/,''))+'</li>';}
+    else if(ln.trim()===''){closeList();}
+    else{closeList();html+='<p>'+inline(ln)+'</p>';}
+  }
+  closeList();return html;
+}
+function mdToText(md){return md.replace(/^#{2,3}\s+/gm,'').replace(/\*\*(.+?)\*\*/g,'$1').trim();}
+function titleFromMd(md){const m=md.match(/^##\s+(.+)$/m);return m?m[1].trim():($('#f-title').value.trim()||'Ata de reunião');}
+
+// ---------- resultado / edição ----------
+function renderResultShell(allowSave){
+  $('#result').innerHTML=
+    '<div class="ata" id="ata-box"></div>'+
+    '<div class="actions">'+
+      '<button class="btn" onclick="sendEmail()">📧 Enviar por e-mail</button>'+
+      '<button class="btn2" onclick="editAta()">✏️ Editar manual</button>'+
+      '<button class="btn2" onclick="copyAta()">Copiar</button>'+
+      (allowSave?'<button class="btn2" onclick="saveCurrent()">Salvar</button>':'')+
+    '</div>'+
+    '<div class="card">'+
+      '<label>Pedir alteração ao Claude (quantas vezes quiser)</label>'+
+      '<div class="row"><div><input id="refine-input" placeholder="ex.: resumo mais curto; é SINDUSCON, não sindcon" onkeydown="if(event.key===\'Enter\')refine()"></div>'+
+        '<div style="flex:0 0 auto"><button class="mic" id="mic" onclick="micToggle()" title="Falar">🎤</button></div></div>'+
+      '<button class="btn" style="margin-top:8px" id="refine-btn" onclick="refine()">Aplicar alteração</button>'+
+      '<label style="margin-top:10px;font-weight:400;display:flex;gap:8px;align-items:center">'+
+        '<input type="checkbox" id="autolearn" checked onchange="autoLearn=this.checked" style="width:auto"> Aprender com minhas correções</label>'+
+      '<div class="status" id="refine-status"></div>'+
+      '<div class="learn" id="learn-box" style="display:none"></div>'+
+      '<div class="conv" id="conv"></div>'+
+    '</div>'+
+    '<div class="status" id="status2"></div>';
+  renderAtaBox();
+}
+function renderAtaBox(){$('#ata-box').innerHTML=mdToHtml(current.md);}
+function renderConv(){const l=current.log||[];
+  $('#conv').innerHTML=l.length?('<div class="hint">Ajustes pedidos:</div>'+l.map((x,i)=>'<div class="u"><b>'+(i+1)+'.</b> '+esc(x)+'</div>').join('')):'';}
+function setLearn(msg){const b=$('#learn-box');if(b){b.style.display='';b.textContent=msg;}}
+function editAta(){
+  $('#ata-box').innerHTML='<label>Editar ata manualmente</label>'+
+    '<textarea class="edit" id="ata-edit"></textarea>'+
+    '<button class="btn" style="margin-top:10px" onclick="saveEdit()">Salvar alterações</button>';
+  $('#ata-edit').value=current.md;
+}
+function saveEdit(){current.md=$('#ata-edit').value;current.title=titleFromMd(current.md);renderAtaBox();toast('Alterações aplicadas.');}
+
+// ---------- enviar / copiar ----------
+async function sendEmail(){
+  const subject='Ata — '+current.title, body=mdToText(current.md);
+  if(navigator.share){try{await navigator.share({title:subject,text:subject+'\n\n'+body});return;}
+    catch(e){if(e.name==='AbortError')return;}}
+  location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+}
+async function copyAta(){try{await navigator.clipboard.writeText(mdToText(current.md));toast('Copiado.');}
+  catch(e){toast('Não foi possível copiar.');}}
+function toast(m){const s=$('#status2');if(s){s.className='status ok';s.textContent=m;}}
+
+// ---------- histórico ----------
+function extractResumo(md){
+  const m=md.match(/###\s*Resumo\s*\n+([\s\S]*?)(\n\s*###|\n\s*##|$)/i);
+  if(m){const first=m[1].trim().split('\n').map(s=>s.trim()).filter(Boolean)[0];return first||'';}
+  return '';
+}
+async function saveCurrent(){
+  toast('Gerando sinopse...');
+  let sinopse='', temas=[];
+  const cfg=loadCfg(), key=cfg.key, model=cfg.model||'claude-sonnet-4-6';
+  if(key){
+    try{
+      const sys='Você resume atas de reunião em português do Brasil. Responda SOMENTE com JSON, sem texto extra.';
+      const msg='Gere uma sinopse de 1 frase (objetiva) e de 3 a 6 temas/palavras-chave desta ata.\n'+
+        'Responda neste JSON: {"sinopse":"...","temas":["...","..."]}\n\nAta:\n'+current.md;
+      const raw=await callApi(sys,[{role:'user',content:msg}],model,key);
+      const js=raw.replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+      const o=JSON.parse(js);
+      sinopse=(o.sinopse||'').trim();
+      temas=Array.isArray(o.temas)?o.temas.map(x=>String(x).trim()).filter(Boolean):[];
+    }catch(e){/* cai no fallback */}
+  }
+  if(!sinopse)sinopse=extractResumo(current.md);
+  const items=get(LS_ITEMS);
+  items.unshift({id:Date.now(),title:current.title,date:current.date||'',md:current.md,sinopse,temas});
+  set(LS_ITEMS,items);
+  toast('Salva no histórico'+(temas.length?' ('+temas.length+' temas).':'.'));
+}
+function renderHist(){
+  const q=($('#hist-q')?$('#hist-q').value:'').trim().toLowerCase();
+  let items=get(LS_ITEMS);
+  if(q)items=items.filter(it=>{
+    const blob=(it.title+' '+(it.sinopse||'')+' '+((it.temas||[]).join(' '))+' '+it.md).toLowerCase();
+    return blob.includes(q);
+  });
+  const el=$('#hist-list');
+  if(!items.length){el.innerHTML='<div class="empty">'+(q?'Nada encontrado para “'+esc(q)+'”.':'Nenhuma ata salva ainda.')+'</div>';return;}
+  el.innerHTML=items.map(it=>{
+    const syn=it.sinopse||extractResumo(it.md);
+    const chips=(it.temas||[]).map(t=>'<span class="chip" onclick="setHistQuery(\''+esc(t).replace(/'/g,"\\'")+'\')">'+esc(t)+'</span>').join('');
+    return '<div class="list-item"><div style="flex:1">'+
+      '<div class="t" style="cursor:pointer" onclick="openItem('+it.id+')">'+esc(it.title)+'</div>'+
+      '<div class="d">'+(it.date||'')+'</div>'+
+      (syn?'<div class="syn">'+esc(syn)+'</div>':'')+
+      (chips?'<div class="chips">'+chips+'</div>':'')+
+      '</div><button class="del" onclick="delItem('+it.id+')">Excluir</button></div>';
+  }).join('');
+}
+function setHistQuery(t){const i=$('#hist-q');if(i){i.value=t;renderHist();}}
+function openItem(id){const it=get(LS_ITEMS).find(x=>x.id===id);if(!it)return;
+  show('new');$('#f-date').value=it.date||$('#f-date').value;
+  const seed=[{role:'user',content:'Esta é a ata atual para edição.'},
+    {role:'assistant',content:'<<<ATA>>>\n'+it.md+'\n<<<APRENDIZADOS>>>\n{"termos":[],"preferencias":[]}'}];
+  current={md:it.md,title:it.title,date:it.date||'',thread:seed,log:[]};
+  renderResultShell(false);
+  $('#result').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function delItem(id){if(!confirm('Excluir esta ata?'))return;set(LS_ITEMS,get(LS_ITEMS).filter(x=>x.id!==id));renderHist();}
+</script>
+</body>
+</html>
