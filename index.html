@@ -219,6 +219,21 @@
       <div class="hint">Toque num tema para filtrar por ele.</div>
       <div id="hist-list" style="margin-top:8px"></div>
     </div>
+
+    <div class="card">
+      <label>Backup das atas</label>
+      <div class="hint" style="margin:0 0 10px">
+        Exporte todas as atas salvas — backup .json (reimportável) ou .md legível com todas juntas.
+      </div>
+      <div class="actions" style="margin-top:0">
+        <button class="btn2" onclick="exportAtasJSON()">⬇️ Backup .json</button>
+        <button class="btn2" onclick="exportAtasMD()">⬇️ Texto .md</button>
+        <button class="btn2" onclick="document.getElementById('atas-file').click()">⬆️ Importar .json</button>
+      </div>
+      <input type="file" id="atas-file" accept="application/json,.json" style="display:none"
+        onchange="importAtas(this.files[0]); this.value='';">
+      <div class="status" id="atas-status"></div>
+    </div>
   </section>
 </div>
 
@@ -717,6 +732,50 @@ function openItem(id){const it=get(LS_ITEMS).find(x=>x.id===id);if(!it)return;
   $('#result').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function delItem(id){if(!confirm('Excluir esta ata?'))return;set(LS_ITEMS,get(LS_ITEMS).filter(x=>x.id!==id));renderHist();}
+
+// ---------- backup das atas ----------
+function dl(content,type,name){
+  const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
+function atasMsg(m,k){const s=$('#atas-status');if(s){s.className='status '+(k||'');s.textContent=m;}}
+function exportAtasJSON(){
+  const items=get(LS_ITEMS);
+  if(!items.length){atasMsg('Não há atas salvas.','err');return;}
+  const data={app:'atas',type:'atas',version:1,exportedAt:new Date().toISOString(),atas:items};
+  dl(JSON.stringify(data,null,2),'application/json','atas-backup-'+new Date().toISOString().slice(0,10)+'.json');
+  atasMsg(items.length+' atas exportadas (.json).','ok');
+}
+function exportAtasMD(){
+  const items=get(LS_ITEMS);
+  if(!items.length){atasMsg('Não há atas salvas.','err');return;}
+  const parts=items.map(it=>{
+    let h='# '+(it.title||'Ata')+'\n';
+    if(it.date)h+='_'+it.date+'_\n';
+    if(it.sinopse)h+='\n> '+it.sinopse+'\n';
+    return h+'\n'+it.md;
+  });
+  dl(parts.join('\n\n---\n\n'),'text/markdown','atas-'+new Date().toISOString().slice(0,10)+'.md');
+  atasMsg(items.length+' atas exportadas (.md).','ok');
+}
+function importAtas(file){
+  if(!file)return;
+  const fr=new FileReader();
+  fr.onload=()=>{try{
+    const d=JSON.parse(fr.result);
+    const arr=Array.isArray(d)?d:(Array.isArray(d.atas)?d.atas:null);
+    if(!arr)throw new Error('o arquivo não contém atas');
+    const items=get(LS_ITEMS); let n=0;
+    arr.forEach(x=>{if(x&&x.md&&!items.some(e=>e.id===x.id)){
+      items.push({id:x.id||(Date.now()+Math.floor(Math.random()*1000)),title:x.title||'Ata',
+        date:x.date||'',md:x.md,sinopse:x.sinopse||'',temas:Array.isArray(x.temas)?x.temas:[]});n++;}});
+    items.sort((a,b)=>(b.id||0)-(a.id||0));
+    set(LS_ITEMS,items); renderHist();
+    atasMsg('Importadas '+n+' novas atas (as repetidas foram ignoradas).','ok');
+  }catch(e){atasMsg('Não foi possível importar: '+e.message,'err');}};
+  fr.onerror=()=>atasMsg('Falha ao ler o arquivo.','err');
+  fr.readAsText(file);
+}
 </script>
 </body>
 </html>
