@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Atas — gerador de atas</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     --bg:#f5f6f8; --card:#ffffff; --ink:#1a1f29; --muted:#6b7280;
@@ -116,6 +117,14 @@
       <textarea id="f-trans" placeholder="Cole aqui o texto transcrito da reunião (do Plaud)..."></textarea>
       <div class="hint">O glossário e as preferências (aba Memória) são aplicados automaticamente.</div>
 
+      <label style="margin-top:14px">Anexos da reunião (opcional)</label>
+      <button class="btn2" onclick="document.getElementById('att-file').click()">📎 Adicionar foto, PDF ou documento</button>
+      <input type="file" id="att-file" accept="image/*,application/pdf,text/plain,.txt,.md,.csv" multiple
+        style="display:none" onchange="addAttachments(this.files); this.value='';">
+      <div class="hint">Fotos do quadro/slides, PDFs ou textos. O Claude usa para acertar nomes, números e termos. Imagens são reduzidas automaticamente.</div>
+      <div id="att-list" style="margin-top:6px"></div>
+      <div class="status" id="att-status"></div>
+
       <details style="margin-top:12px">
         <summary>Participantes frequentes (cadastro)</summary>
         <div style="margin-top:10px">
@@ -140,6 +149,16 @@
           </select>
           <div class="hint">A chave nunca sai do seu celular além da chamada direta ao Claude.
             Pegue em console.anthropic.com → API Keys. Se um modelo der erro, troque aqui.</div>
+        </div>
+      </details>
+
+      <details style="margin-top:10px">
+        <summary>Configurar envio por Gmail (API) — opcional</summary>
+        <div style="margin-top:10px">
+          <label>Client ID do Google (OAuth)</label>
+          <input id="f-gmail-cid" placeholder="xxxxxxxx.apps.googleusercontent.com">
+          <div class="hint">Permite enviar a ata direto pela sua conta Gmail, sem abrir outro app.
+            Exige criar uma credencial OAuth no Google Cloud (eu te ajudo). Sem isso, o botão usa o compartilhamento padrão do aparelho.</div>
         </div>
       </details>
 
@@ -214,9 +233,12 @@ let autoLearn=true, rec=null, current=null;
 
 // ---------- config ----------
 function loadCfg(){try{return JSON.parse(localStorage.getItem(LS_CFG))||{}}catch(e){return{}}}
-function saveCfg(){set(LS_CFG,{key:$('#f-key').value.trim(),model:$('#f-model').value});}
+function saveCfg(){const c=loadCfg();
+  set(LS_CFG,{...c, key:$('#f-key').value.trim(), model:$('#f-model').value,
+    gmailClientId:($('#f-gmail-cid')?$('#f-gmail-cid').value.trim():(c.gmailClientId||''))});}
 (function init(){
   const c=loadCfg(); if(c.key)$('#f-key').value=c.key; if(c.model)$('#f-model').value=c.model;
+  if(c.gmailClientId&&$('#f-gmail-cid'))$('#f-gmail-cid').value=c.gmailClientId;
   $('#f-date').value=new Date().toISOString().slice(0,10);
   renderPeople();
 })();
@@ -299,14 +321,11 @@ function importMemory(file){
       const d=JSON.parse(fr.result);
       if(d.type&&d.type!=='memoria') throw new Error('arquivo não é uma memória de atas');
       let nt=0,np=0,npl=0;
-      // termos (dedupe por term, case-insensitive)
       if(Array.isArray(d.termos)){const t=get(LS_TERMS);
         d.termos.forEach(x=>{if(x&&x.term&&!t.some(e=>e.term.toLowerCase()===String(x.term).toLowerCase())){
           t.push({term:x.term,var:x.var||''});nt++;}});set(LS_TERMS,t);}
-      // preferências
       if(Array.isArray(d.preferencias)){const p=get(LS_PREFS);
         d.preferencias.forEach(x=>{if(x&&!p.includes(x)){p.push(x);np++;}});set(LS_PREFS,p);}
-      // participantes
       if(Array.isArray(d.participantes)){const pe=get(LS_PEOPLE);
         d.participantes.forEach(x=>{if(x&&!pe.includes(x)){pe.push(x);npl++;}});set(LS_PEOPLE,pe);}
       renderTerms();renderPrefs();renderPeople();
@@ -317,6 +336,51 @@ function importMemory(file){
   fr.readAsText(file);
 }
 function memMsg(m,kind){const s=$('#mem-status');if(s){s.className='status '+(kind||'');s.textContent=m;}}
+
+// ---------- anexos ----------
+let attachments=[];
+function fileToB64(file){return new Promise((res,rej)=>{const fr=new FileReader();
+  fr.onload=()=>res(String(fr.result).split(',')[1]);fr.onerror=rej;fr.readAsDataURL(file);});}
+function fileToText(file){return new Promise((res,rej)=>{const fr=new FileReader();
+  fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsText(file);});}
+function downscaleImage(file,maxDim=1500,quality=0.85){
+  return new Promise((res,rej)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{let w=img.naturalWidth,h=img.naturalHeight;
+      if(Math.max(w,h)>maxDim){const r=maxDim/Math.max(w,h);w=Math.round(w*r);h=Math.round(h*r);}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      let durl;try{durl=c.toDataURL('image/jpeg',quality);}catch(e){URL.revokeObjectURL(url);return rej(e);}
+      URL.revokeObjectURL(url);res({media_type:'image/jpeg',data:durl.split(',')[1]});};
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('imagem inválida'));};
+    img.src=url;});
+}
+async function addAttachments(fileList){
+  const st=$('#att-status'); st.className='status run'; st.textContent='Processando anexos...';
+  let problem='';
+  for(const f of Array.from(fileList||[])){
+    try{
+      if(f.type.startsWith('image/')){
+        const o=await downscaleImage(f);
+        attachments.push({kind:'image',name:f.name,media_type:o.media_type,data:o.data});
+      }else if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){
+        if(f.size>20*1024*1024){problem='PDF muito grande (máx ~20MB): '+f.name;continue;}
+        attachments.push({kind:'pdf',name:f.name,data:await fileToB64(f)});
+      }else if(f.type.startsWith('text/')||/\.(txt|md|csv)$/i.test(f.name)){
+        attachments.push({kind:'text',name:f.name,text:await fileToText(f)});
+      }else{problem='Tipo não suportado: '+f.name+' (use imagem, PDF ou texto).';}
+    }catch(e){problem='Erro em '+f.name+': '+e.message;}
+  }
+  renderAtt();
+  st.className='status '+(problem?'err':''); st.textContent=problem||'';
+}
+function renderAtt(){
+  $('#att-list').innerHTML=attachments.map((a,i)=>
+    '<div class="list-item"><div class="t" style="font-weight:400">'+
+    (a.kind==='image'?'🖼️ ':a.kind==='pdf'?'📄 ':'📝 ')+esc(a.name)+'</div>'+
+    '<button class="del" onclick="removeAtt('+i+')">Remover</button></div>').join('');
+}
+function removeAtt(i){attachments.splice(i,1);renderAtt();}
 
 // ---------- prompts ----------
 function genSystem(){
@@ -361,6 +425,18 @@ Transcrição:
 """
 ${tr}
 """`;
+}
+function buildUserContent(){
+  const txt=buildUserGen();
+  if(!attachments.length)return txt;
+  const blocks=[{type:'text',text:'Documentos e fotos anexados pelo usuário, que fazem parte desta reunião — use-os para enriquecer a ata e corrigir nomes, números e termos:'}];
+  for(const a of attachments){
+    if(a.kind==='image')blocks.push({type:'image',source:{type:'base64',media_type:a.media_type,data:a.data}});
+    else if(a.kind==='pdf')blocks.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:a.data}});
+    else if(a.kind==='text')blocks.push({type:'text',text:'Documento anexo ("'+a.name+'"):\n"""\n'+a.text+'\n"""'});
+  }
+  blocks.push({type:'text',text:txt});
+  return blocks;
 }
 
 // ---------- API ----------
@@ -414,11 +490,12 @@ async function generate(){
   saveCfg();
   $('#gen').disabled=true; st.className='status run'; st.innerHTML='<span class="spin"></span>Gerando ata...';
   try{
-    const thread=[{role:'user',content:buildUserGen()}];
+    const thread=[{role:'user',content:buildUserContent()}];
     const raw=await callApi(genSystem(),thread,model,key);
     thread.push({role:'assistant',content:raw});
     const {ata,learn}=parseResponse(raw);
     current={md:ata,title:titleFromMd(ata),date:$('#f-date').value,thread,log:[]};
+    attachments=[]; renderAtt();
     renderResultShell(true);
     const lm=mergeLearnings(learn);
     st.className='status ok'; st.textContent='Pronto. Peça ajustes abaixo se precisar.';
@@ -493,6 +570,8 @@ function titleFromMd(md){const m=md.match(/^##\s+(.+)$/m);return m?m[1].trim():(
 function renderResultShell(allowSave){
   $('#result').innerHTML=
     '<div class="ata" id="ata-box"></div>'+
+    '<div class="row" style="margin-top:12px"><div>'+
+      '<input id="to-input" placeholder="Destinatário(s) do e-mail, separados por vírgula"></div></div>'+
     '<div class="actions">'+
       '<button class="btn" onclick="sendEmail()">📧 Enviar por e-mail</button>'+
       '<button class="btn2" onclick="editAta()">✏️ Editar manual</button>'+
@@ -512,6 +591,7 @@ function renderResultShell(allowSave){
     '</div>'+
     '<div class="status" id="status2"></div>';
   renderAtaBox();
+  if($('#to-input'))$('#to-input').value=loadCfg().lastTo||'';
 }
 function renderAtaBox(){$('#ata-box').innerHTML=mdToHtml(current.md);}
 function renderConv(){const l=current.log||[];
@@ -526,11 +606,54 @@ function editAta(){
 function saveEdit(){current.md=$('#ata-edit').value;current.title=titleFromMd(current.md);renderAtaBox();toast('Alterações aplicadas.');}
 
 // ---------- enviar / copiar ----------
+let googleTok=null; // {token, exp}
+function getGoogleToken(clientId){
+  return new Promise((res,rej)=>{
+    if(googleTok&&Date.now()<googleTok.exp-60000)return res(googleTok.token);
+    if(!(window.google&&google.accounts&&google.accounts.oauth2))
+      return rej(new Error('o login do Google ainda não carregou; recarregue a página e tente de novo'));
+    const tc=google.accounts.oauth2.initTokenClient({
+      client_id:clientId, scope:'https://www.googleapis.com/auth/gmail.send',
+      callback:(resp)=>{if(resp&&resp.access_token){googleTok={token:resp.access_token,exp:Date.now()+(resp.expires_in||3600)*1000};res(resp.access_token);}else rej(new Error('autorização não concluída'));},
+      error_callback:(e)=>rej(new Error((e&&e.type)||'falha na autorização do Google'))
+    });
+    tc.requestAccessToken();
+  });
+}
+function gmailRaw(to,subject,body){
+  const enc=s=>btoa(unescape(encodeURIComponent(s)));
+  const msg=['To: '+to,'Subject: =?UTF-8?B?'+enc(subject)+'?=','MIME-Version: 1.0',
+    'Content-Type: text/plain; charset="UTF-8"','Content-Transfer-Encoding: base64','',enc(body)].join('\r\n');
+  return btoa(msg).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+async function gmailSend(to,subject,body,clientId){
+  const token=await getGoogleToken(clientId);
+  const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
+    method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({raw:gmailRaw(to,subject,body)})});
+  if(!r.ok)throw new Error('Gmail '+r.status+': '+(await r.text()).slice(0,200));
+}
+function shareFallback(subject,body,to){
+  if(navigator.share){navigator.share({title:subject,text:subject+'\n\n'+body}).catch(()=>{});return;}
+  location.href='mailto:'+encodeURIComponent(to||'')+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+}
 async function sendEmail(){
   const subject='Ata — '+current.title, body=mdToText(current.md);
-  if(navigator.share){try{await navigator.share({title:subject,text:subject+'\n\n'+body});return;}
-    catch(e){if(e.name==='AbortError')return;}}
-  location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  const cfg=loadCfg(), to=($('#to-input')?$('#to-input').value.trim():''), s2=$('#status2');
+  if(cfg.gmailClientId){
+    if(!to){if(s2){s2.className='status err';s2.textContent='Informe o destinatário.';}return;}
+    if(s2){s2.className='status run';s2.innerHTML='<span class="spin"></span>Enviando pelo Gmail...';}
+    try{
+      await gmailSend(to,subject,body,cfg.gmailClientId);
+      const c=loadCfg();c.lastTo=to;set(LS_CFG,c);
+      if(s2){s2.className='status ok';s2.textContent='Enviado pelo Gmail para '+to+'.';}
+    }catch(e){
+      if(s2){s2.className='status err';s2.textContent='Falha no envio pelo Gmail: '+(e.message||e)+'. Abrindo alternativa de compartilhar.';}
+      shareFallback(subject,body,to);
+    }
+    return;
+  }
+  shareFallback(subject,body,to);
 }
 async function copyAta(){try{await navigator.clipboard.writeText(mdToText(current.md));toast('Copiado.');}
   catch(e){toast('Não foi possível copiar.');}}
