@@ -93,7 +93,7 @@
     <h1><span class="dot"></span> Atas</h1>
     <p class="sub">Gere a ata, peça ajustes ao Claude (texto ou voz) quantas vezes quiser, e envie.</p>
     <div class="tabs">
-      <button class="tab on" id="tab-new" onclick="show('new')">Nova ata</button>
+      <button class="tab on" id="tab-new" onclick="newAta()">Nova ata</button>
       <button class="tab" id="tab-terms" onclick="show('terms')">Memória</button>
       <button class="tab" id="tab-hist" onclick="show('hist')">Histórico</button>
     </div>
@@ -257,6 +257,18 @@ function saveCfg(){const c=loadCfg();
   $('#f-date').value=new Date().toISOString().slice(0,10);
   renderPeople();
 })();
+
+// ---------- nova ata (limpa os campos) ----------
+function newAta(){
+  ['#f-title','#f-people','#f-place','#f-trans'].forEach(s=>{const el=$(s);if(el)el.value='';});
+  if($('#f-date'))$('#f-date').value=new Date().toISOString().slice(0,10);
+  attachments=[]; if($('#att-list'))renderAtt(); if($('#att-status'))$('#att-status').textContent='';
+  current=null;
+  if($('#result'))$('#result').innerHTML='';
+  const st=$('#status'); if(st){st.className='status';st.textContent='';}
+  show('new');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
 
 // ---------- abas ----------
 function show(v){
