@@ -82,7 +82,13 @@
   .list-item:last-child{border-bottom:0}
   .list-item .t{font-weight:600;font-size:15px}
   .list-item .d{font-size:12.5px;color:var(--muted)}
-  .syn{font-size:13px;color:var(--ink);margin-top:4px;line-height:1.4}
+  .syn{font-size:13px;color:var(--ink);margin-top:4px;line-height:1.4;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .scrolllist{max-height:46vh;overflow-y:auto;border:1px solid var(--line);
+    border-radius:10px;padding:0 11px;margin-top:8px;-webkit-overflow-scrolling:touch}
+  .scrolllist:empty{display:none}
+  .count{color:var(--muted);font-weight:400;font-size:12px}
+  details.card summary{font-size:14px;color:var(--ink)}
   .link{color:var(--brand);background:none;padding:6px;width:auto;font-size:13px}
   .del{color:var(--danger);background:none;padding:6px;width:auto;font-size:13px}
   .status{font-size:13px;margin-top:10px;min-height:18px}
@@ -211,58 +217,62 @@
   <!-- MEMÓRIA (termos + preferências) -->
   <section id="view-terms" style="display:none">
     <div class="card">
-      <label>Glossário de termos do setor</label>
-      <div class="hint" style="margin:0 0 10px">
-        Grafia correta (ex.: SINDUSCON) e, opcional, como aparece errado na transcrição
-        (ex.: "sindscon, sin dus con"). O app também aprende termos sozinho quando você corrige uma ata.
-      </div>
-      <label>Termo correto</label>
-      <input id="t-term" placeholder="Ex.: SINDUSCON">
-      <label style="margin-top:8px">Como aparece errado (opcional, separado por vírgula)</label>
-      <input id="t-var" placeholder="sindscon, sin dus con">
-      <button class="btn" style="margin-top:10px" onclick="addTerm()">Adicionar termo</button>
-      <div id="terms-list" style="margin-top:6px"></div>
+      <label>Glossário de termos <span class="count" id="terms-count"></span></label>
+      <details style="margin:8px 0">
+        <summary>+ Adicionar termo</summary>
+        <div style="margin-top:10px">
+          <div class="hint" style="margin:0 0 8px">Grafia correta (ex.: SINDUSCON) e, opcional, como aparece errado na transcrição. O app também aprende termos sozinho ao corrigir atas.</div>
+          <label>Termo correto</label>
+          <input id="t-term" placeholder="Ex.: SINDUSCON">
+          <label style="margin-top:8px">Como aparece errado (opcional, separado por vírgula)</label>
+          <input id="t-var" placeholder="sindscon, sin dus con">
+          <button class="btn" style="margin-top:10px" onclick="addTerm()">Adicionar termo</button>
+        </div>
+      </details>
+      <div id="terms-list" class="scrolllist"></div>
     </div>
 
     <div class="card">
-      <label>Preferências aprendidas (estilo/formato)</label>
-      <div class="hint" style="margin:0 0 10px">
-        O que você ensina ao corrigir as atas fica aqui e vale para as próximas (ex.: "Resumo em no máximo 3 frases").
-      </div>
-      <input id="pref-add" placeholder="ex.: Listar decisões antes das tarefas">
-      <button class="btn" style="margin-top:8px" onclick="addPref()">Adicionar preferência</button>
-      <div id="prefs-list" style="margin-top:6px"></div>
+      <label>Preferências aprendidas <span class="count" id="prefs-count"></span></label>
+      <details style="margin:8px 0">
+        <summary>+ Adicionar preferência</summary>
+        <div style="margin-top:10px">
+          <div class="hint" style="margin:0 0 8px">Vale para as próximas atas (ex.: "Resumo em no máximo 3 frases").</div>
+          <input id="pref-add" placeholder="ex.: Listar decisões antes das tarefas">
+          <button class="btn" style="margin-top:8px" onclick="addPref()">Adicionar preferência</button>
+        </div>
+      </details>
+      <div id="prefs-list" class="scrolllist"></div>
     </div>
 
-    <div class="card">
-      <label>Backup da memória</label>
-      <div class="hint" style="margin:0 0 10px">
-        Salve um arquivo com glossário, preferências e participantes — para guardar ou levar a outro aparelho.
-        Ao importar, os itens são mesclados (sem apagar nem duplicar o que já existe).
+    <details class="card">
+      <summary>Backup da memória</summary>
+      <div class="hint" style="margin:10px 0">
+        Salve glossário, preferências e participantes para guardar ou levar a outro aparelho. Ao importar, os itens são mesclados (sem duplicar).
       </div>
       <div class="actions" style="margin-top:0">
-        <button class="btn2" onclick="exportMemory()">⬇️ Exportar memória</button>
-        <button class="btn2" onclick="document.getElementById('mem-file').click()">⬆️ Importar memória</button>
+        <button class="btn2" onclick="exportMemory()">⬇️ Exportar</button>
+        <button class="btn2" onclick="document.getElementById('mem-file').click()">⬆️ Importar</button>
       </div>
       <input type="file" id="mem-file" accept="application/json,.json" style="display:none"
         onchange="importMemory(this.files[0]); this.value='';">
       <div class="status" id="mem-status"></div>
-    </div>
+    </details>
   </section>
 
   <!-- HISTÓRICO -->
   <section id="view-hist" style="display:none">
     <div class="card">
-      <label>Pesquisar atas</label>
-      <input id="hist-q" placeholder="Por tema, título ou conteúdo..." oninput="renderHist()">
+      <label>Atas salvas <span class="count" id="hist-count"></span></label>
+      <input id="hist-q" placeholder="Pesquisar por tema, título ou conteúdo..." oninput="renderHist()">
       <div class="hint">Toque num tema para filtrar por ele.</div>
-      <div id="hist-list" style="margin-top:8px"></div>
+      <div id="hist-list" class="scrolllist" style="margin-top:8px"></div>
     </div>
 
-    <div class="card">
-      <label>Backup das atas</label>
-      <div class="hint" style="margin:0 0 10px">
-        Exporte todas as atas salvas — backup .json (reimportável) ou .md legível com todas juntas.
+    <details class="card">
+      <summary>Backup das atas</summary>
+      <div class="hint" style="margin:10px 0">
+        Backup .json (reimportável) ou .md legível com todas juntas.
       </div>
       <div class="actions" style="margin-top:0">
         <button class="btn2" onclick="exportAtasJSON()">⬇️ Backup .json</button>
@@ -272,7 +282,7 @@
       <input type="file" id="atas-file" accept="application/json,.json" style="display:none"
         onchange="importAtas(this.files[0]); this.value='';">
       <div class="status" id="atas-status"></div>
-    </div>
+    </details>
   </section>
 </div>
 <div id="print-area"></div>
@@ -345,6 +355,7 @@ function pickPerson(name){const f=$('#f-people');
 // ---------- termos ----------
 function renderTerms(){
   const t=get(LS_TERMS),el=$('#terms-list');
+  const cn=$('#terms-count'); if(cn)cn.textContent=t.length?'('+t.length+')':'';
   if(!t.length){el.innerHTML='<div class="empty">Nenhum termo cadastrado.</div>';return;}
   el.innerHTML=t.map((x,i)=>
     '<div class="list-item"><div><div class="t">'+esc(x.term)+'</div>'+
@@ -364,6 +375,7 @@ function buildGlossary(){
 // ---------- preferências ----------
 function renderPrefs(){
   const p=get(LS_PREFS),el=$('#prefs-list');
+  const cn=$('#prefs-count'); if(cn)cn.textContent=p.length?'('+p.length+')':'';
   if(!p.length){el.innerHTML='<div class="empty">Nenhuma preferência ainda.</div>';return;}
   el.innerHTML=p.map((x,i)=>
     '<div class="list-item"><div class="t" style="font-weight:400">'+esc(x)+'</div><button class="del" onclick="delPref('+i+')">Remover</button></div>').join('');
@@ -813,6 +825,7 @@ async function saveCurrent(){
 function renderHist(){
   const q=($('#hist-q')?$('#hist-q').value:'').trim().toLowerCase();
   let items=get(LS_ITEMS);
+  const cn=$('#hist-count'); if(cn)cn.textContent=items.length?'('+items.length+')':'';
   if(q)items=items.filter(it=>{
     const blob=(it.title+' '+(it.sinopse||'')+' '+((it.temas||[]).join(' '))+' '+it.md).toLowerCase();
     return blob.includes(q);
