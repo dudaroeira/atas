@@ -56,6 +56,14 @@
   .tab{flex:1;text-align:center;padding:9px 4px;border-radius:10px;background:transparent;
     border:1px solid var(--line);color:var(--muted);font-weight:600;font-size:13.5px}
   .tab.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .seg{display:flex;gap:8px}
+  .segbtn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+    border:1px solid var(--line);border-radius:10px;padding:10px;font-weight:600;
+    color:var(--muted);cursor:pointer;font-size:14px}
+  .segbtn input{width:auto;margin:0}
+  .segbtn:has(input:checked){background:var(--brand);color:#fff;border-color:var(--brand)}
+  .opt{font-weight:400;display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:14px;line-height:1.35}
+  .opt input{width:auto;margin-top:2px;flex:0 0 auto}
   details summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
   .chip{background:var(--chip);border:1px solid var(--line);color:var(--ink);
@@ -88,6 +96,17 @@
   .conv{margin-top:10px}
   .conv .u{font-size:13px;padding:7px 0;border-top:1px dashed var(--line);color:var(--ink)}
   .conv .u b{color:var(--brand)}
+  #print-area{display:none}
+  @media print{
+    @page{margin:16mm}
+    header,#view-new,#view-terms,#view-hist{display:none!important}
+    #print-area{display:block!important;color:#000;font-size:12pt;line-height:1.5}
+    #print-area h2{font-size:18pt;margin:0 0 6pt}
+    #print-area h3{font-size:12pt;color:#1f6feb;text-transform:uppercase;
+      border-bottom:1px solid #bbb;padding-bottom:2pt;margin:14pt 0 4pt}
+    #print-area ul{padding-left:18pt} #print-area li{margin:3pt 0}
+    #print-area p{margin:5pt 0}
+  }
 </style>
 </head>
 <body>
@@ -105,6 +124,23 @@
   <!-- NOVA ATA -->
   <section id="view-new">
     <div class="card">
+      <label>Tipo de saída</label>
+      <div class="seg">
+        <label class="segbtn"><input type="radio" name="mode" value="ata" checked> 📋 Ata</label>
+        <label class="segbtn"><input type="radio" name="mode" value="resumo"> 📝 Resumo</label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div><label>Detalhamento</label>
+          <select id="f-detail">
+            <option value="auto">Automático (proporcional ao conteúdo)</option>
+            <option value="detalhado">Detalhado</option>
+            <option value="conciso">Conciso</option>
+          </select>
+        </div>
+      </div>
+      <label class="opt"><input type="checkbox" id="f-infer">
+        Inferir participantes e falas pela IA, ignorando os nomes da transcrição (útil quando o Plaud erra quem falou)</label>
+      <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
       <div class="row" style="margin-bottom:10px">
         <div><label>Título</label><input id="f-title" placeholder="Reunião com..."></div>
         <div><label>Data</label><input id="f-date" type="date"></div>
@@ -239,6 +275,7 @@
     </div>
   </section>
 </div>
+<div id="print-area"></div>
 
 <script>
 const $=s=>document.querySelector(s);
@@ -268,6 +305,9 @@ function saveCfg(){const c=loadCfg();
 function newAta(){
   ['#f-title','#f-people','#f-place','#f-trans'].forEach(s=>{const el=$(s);if(el)el.value='';});
   if($('#f-date'))$('#f-date').value=new Date().toISOString().slice(0,10);
+  const am=document.querySelector('input[name="mode"][value="ata"]'); if(am)am.checked=true;
+  if($('#f-detail'))$('#f-detail').value='auto';
+  if($('#f-infer'))$('#f-infer').checked=false;
   attachments=[]; if($('#att-list'))renderAtt(); if($('#att-status'))$('#att-status').textContent='';
   current=null;
   if($('#result'))$('#result').innerHTML='';
@@ -413,41 +453,85 @@ function renderAtt(){
 function removeAtt(i){attachments.splice(i,1);renderAtt();}
 
 // ---------- prompts ----------
-function genSystem(){
-  return `Você cria e edita ATAS de reunião em português do Brasil a partir de transcrições geradas por IA (com erros).
+function readOpts(){
+  const m=document.querySelector('input[name="mode"]:checked');
+  return {
+    mode: m?m.value:'ata',
+    detail: $('#f-detail')?$('#f-detail').value:'auto',
+    infer: $('#f-infer')?$('#f-infer').checked:false
+  };
+}
+function genSystem(opts){
+  opts=opts||{mode:'ata',detail:'auto',infer:false};
+  const detailTxt = opts.detail==='detalhado'
+    ? 'Seja COMPLETO e detalhado: cubra TODOS os tópicos discutidos, com contexto, números, prazos e nuances. Não resuma em excesso.'
+    : opts.detail==='conciso'
+    ? 'Seja conciso e direto, mantendo o essencial.'
+    : 'O tamanho deve ser PROPORCIONAL ao conteúdo: transcrições longas geram documentos mais completos. Preserve todos os tópicos, decisões, números e prazos relevantes; não resuma demais.';
+  const inferTxt = opts.infer
+    ? '\nIMPORTANTE: os nomes na transcrição podem estar ERRADOS (o gravador atribui falas à pessoa errada). IGNORE os nomes literais da transcrição e deduza os participantes e quem disse o quê pelo conteúdo e contexto. Use a lista de participantes frequentes/glossário quando fizer sentido. Se não der para identificar alguém, use "Participante 1", "Participante 2". Não invente nomes.\n'
+    : '';
+  let papel, fmt;
+  if(opts.mode==='resumo'){
+    papel='Você produz RESUMOS claros de reuniões e palestras em português do Brasil a partir de transcrições geradas por IA (com erros).';
+    fmt=`Formato (Markdown, nesta ordem):
+## [Título]
+**Data:** [data]  ·  **Local:** [local]
 
-Formato da ata (Markdown, exatamente nesta ordem):
+### Resumo
+[um ou mais parágrafos cobrindo os principais pontos, proporcional ao conteúdo]
+
+### Pontos principais
+- [ponto relevante]
+
+### Conclusões / Próximos passos
+- [conclusão ou encaminhamento; omita se não houver]`;
+  } else {
+    papel='Você cria ATAS de reunião em português do Brasil a partir de transcrições geradas por IA (com erros).';
+    fmt=`Formato da ata (Markdown, nesta ordem):
 ## [Título da reunião]
 **Data:** [data]  ·  **Local:** [local]
 **Participantes:** [lista]
 
 ### Resumo
-[parágrafo curto e objetivo]
+[panorama do que foi tratado]
+
+### Pauta / Tópicos discutidos
+- [tópico e o que foi falado sobre ele]
 
 ### Decisões
 - [decisão]
 
 ### Tarefas / Ações
-- [Ação] — **Responsável:** [nome] — **Prazo:** [data ou "a definir"]
+- [Ação] — **Responsável:** [nome] — **Prazo:** [data ou "a definir"]`;
+  }
+  return `${papel}
 
-Regras: use só dados da transcrição; não invente nomes, números nem datas; identifique participantes pela fala/citação; corrija grafias pelo glossário; seja conciso.
+${fmt}
+
+Regras: use só dados da transcrição; não invente nomes, números nem datas; corrija grafias pelo glossário. ${detailTxt}${inferTxt}
 ${buildGlossary()}${buildPrefs()}
-Quando o usuário pedir alterações, devolva SEMPRE a ata COMPLETA e atualizada (não só o trecho mudado).
+Quando o usuário pedir alterações, devolva SEMPRE o documento COMPLETO e atualizado (não só o trecho mudado). Omita seções que claramente não se apliquem.
 
 Responda SEMPRE exatamente neste formato, com os marcadores em linhas próprias:
 <<<ATA>>>
-(a ata completa em Markdown)
+(o documento completo em Markdown)
 <<<APRENDIZADOS>>>
-(um JSON: {"termos":[{"term":"","var":""}],"preferencias":[""]} — liste APENAS correções de termos e regras de estilo/formato duráveis que valham para próximas atas; listas vazias se não houver)`;
+(um JSON: {"termos":[{"term":"","var":""}],"preferencias":[""]} — liste APENAS correções de termos e regras de estilo/formato duráveis; listas vazias se não houver)`;
 }
-function buildUserGen(){
+function buildUserGen(opts){
+  opts=opts||{mode:'ata'};
   const t=$('#f-title').value.trim(), d=$('#f-date').value, p=$('#f-people').value.trim(),
         l=$('#f-place').value.trim(), tr=$('#f-trans').value.trim();
   const roster=get(LS_PEOPLE);
-  return `Crie a ata a partir desta transcrição.
+  const verbo=opts.mode==='resumo'?'Faça o resumo':'Crie a ata';
+  const partLine=opts.infer
+    ? 'Participantes: deduza pelo conteúdo (ignore os nomes da transcrição).'
+    : 'Participantes informados: '+(p||'(deduzir da transcrição)');
+  return `${verbo} a partir desta transcrição.
 Título: ${t||'(deduzir)'}
 Data: ${d||'(deduzir)'}
-Participantes informados: ${p||'(deduzir da transcrição)'}
+${partLine}
 Local: ${l||'(deduzir)'}
 ${roster.length?'Participantes frequentes conhecidos: '+roster.join(', ')+'.':''}
 
@@ -456,8 +540,8 @@ Transcrição:
 ${tr}
 """`;
 }
-function buildUserContent(){
-  const txt=buildUserGen();
+function buildUserContent(opts){
+  const txt=buildUserGen(opts);
   if(!attachments.length)return txt;
   const blocks=[{type:'text',text:'Documentos e fotos anexados pelo usuário, que fazem parte desta reunião — use-os para enriquecer a ata e corrigir nomes, números e termos:'}];
   for(const a of attachments){
@@ -470,12 +554,12 @@ function buildUserContent(){
 }
 
 // ---------- API ----------
-async function callApi(system,messages,model,key){
+async function callApi(system,messages,model,key,maxTokens){
   const r=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{'content-type':'application/json','x-api-key':key,
       'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model,max_tokens:2500,system,messages})
+    body:JSON.stringify({model,max_tokens:maxTokens||8000,system,messages})
   });
   if(!r.ok){const e=await r.text();throw new Error('API '+r.status+': '+e.slice(0,200));}
   const data=await r.json();
@@ -520,11 +604,12 @@ async function generate(){
   saveCfg();
   $('#gen').disabled=true; st.className='status run'; st.innerHTML='<span class="spin"></span>Gerando ata...';
   try{
-    const thread=[{role:'user',content:buildUserContent()}];
-    const raw=await callApi(genSystem(),thread,model,key);
+    const opts=readOpts();
+    const thread=[{role:'user',content:buildUserContent(opts)}];
+    const raw=await callApi(genSystem(opts),thread,model,key,8000);
     thread.push({role:'assistant',content:raw});
     const {ata,learn}=parseResponse(raw);
-    current={md:ata,title:titleFromMd(ata),date:$('#f-date').value,thread,log:[]};
+    current={md:ata,title:titleFromMd(ata),date:$('#f-date').value,thread,log:[],opts};
     attachments=[]; renderAtt();
     renderResultShell(true);
     const lm=mergeLearnings(learn);
@@ -547,7 +632,7 @@ async function refine(){
   current.thread.push({role:'user',content:txt});
   $('#refine-btn').disabled=true; rs.className='status run'; rs.innerHTML='<span class="spin"></span>Atualizando...';
   try{
-    const raw=await callApi(genSystem(),current.thread,model,key);
+    const raw=await callApi(genSystem(current.opts||{}),current.thread,model,key,8000);
     current.thread.push({role:'assistant',content:raw});
     const {ata,learn}=parseResponse(raw);
     current.md=ata; current.title=titleFromMd(ata);
@@ -605,6 +690,7 @@ function renderResultShell(allowSave){
     '<div class="actions">'+
       '<button class="btn" onclick="sendEmail()">📧 Enviar por e-mail</button>'+
       '<button class="btn2" onclick="editAta()">✏️ Editar manual</button>'+
+      '<button class="btn2" onclick="makePdf()">📄 PDF</button>'+
       '<button class="btn2" onclick="copyAta()">Copiar</button>'+
       (allowSave?'<button class="btn2" onclick="saveCurrent()">Salvar</button>':'')+
     '</div>'+
@@ -687,6 +773,13 @@ async function sendEmail(){
 }
 async function copyAta(){try{await navigator.clipboard.writeText(mdToText(current.md));toast('Copiado.');}
   catch(e){toast('Não foi possível copiar.');}}
+function makePdf(){
+  if(!current)return;
+  const pa=document.getElementById('print-area');
+  pa.innerHTML=mdToHtml(current.md);
+  document.title=(current.title||'Ata');
+  setTimeout(()=>window.print(),60);
+}
 function toast(m){const s=$('#status2');if(s){s.className='status ok';s.textContent=m;}}
 
 // ---------- histórico ----------
@@ -704,7 +797,7 @@ async function saveCurrent(){
       const sys='Você resume atas de reunião em português do Brasil. Responda SOMENTE com JSON, sem texto extra.';
       const msg='Gere uma sinopse de 1 frase (objetiva) e de 3 a 6 temas/palavras-chave desta ata.\n'+
         'Responda neste JSON: {"sinopse":"...","temas":["...","..."]}\n\nAta:\n'+current.md;
-      const raw=await callApi(sys,[{role:'user',content:msg}],model,key);
+      const raw=await callApi(sys,[{role:'user',content:msg}],model,key,600);
       const js=raw.replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
       const o=JSON.parse(js);
       sinopse=(o.sinopse||'').trim();
@@ -742,7 +835,7 @@ function openItem(id){const it=get(LS_ITEMS).find(x=>x.id===id);if(!it)return;
   show('new');$('#f-date').value=it.date||$('#f-date').value;
   const seed=[{role:'user',content:'Esta é a ata atual para edição.'},
     {role:'assistant',content:'<<<ATA>>>\n'+it.md+'\n<<<APRENDIZADOS>>>\n{"termos":[],"preferencias":[]}'}];
-  current={md:it.md,title:it.title,date:it.date||'',thread:seed,log:[]};
+  current={md:it.md,title:it.title,date:it.date||'',thread:seed,log:[],opts:{mode:'ata',detail:'auto',infer:false}};
   renderResultShell(false);
   $('#result').scrollIntoView({behavior:'smooth',block:'start'});
 }
