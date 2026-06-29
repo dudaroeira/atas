@@ -13,49 +13,58 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
-    --bg:#f5f6f8; --card:#ffffff; --ink:#1a1f29; --muted:#6b7280;
-    --line:#e6e8eb; --brand:#1f6feb; --brand-d:#1a5fd0; --ok:#0f9d58;
-    --danger:#d23f3f; --chip:#eef2ff; --radius:14px;
+    --bg:#eef1f7; --card:#ffffff; --field:#ffffff; --ink:#0f1b33; --muted:#5b6675;
+    --line:#e2e6ef; --brand:#1f5fde; --brand-d:#1647ad; --brand-ink:#15306e;
+    --ok:#0f9d58; --danger:#d23f3f; --chip:#eaf1fe; --radius:14px;
+    --shadow:0 1px 2px rgba(16,30,60,.06), 0 6px 18px rgba(16,30,60,.06);
   }
   @media (prefers-color-scheme: dark){
-    :root{--bg:#0f1115;--card:#171a21;--ink:#e7e9ee;--muted:#9aa3b2;
-    --line:#262b35;--chip:#1d2230;}
+    :root{--bg:#0c0f16;--card:#141a26;--field:#0f1522;--ink:#e7ecf5;--muted:#98a3b6;
+    --line:#232c3d;--brand:#4b86f7;--brand-d:#3a72e6;--brand-ink:#cdd9f5;--chip:#1a2236;
+    --shadow:0 1px 2px rgba(0,0,0,.4);}
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    -webkit-text-size-adjust:100%}
-  .wrap{max-width:680px;margin:0 auto;padding:env(safe-area-inset-top) 14px 90px}
-  header{position:sticky;top:0;background:var(--bg);padding:14px 0 8px;z-index:20}
-  h1{font-size:20px;margin:0;display:flex;align-items:center;gap:8px}
-  .dot{width:10px;height:10px;border-radius:50%;background:var(--brand)}
-  .sub{color:var(--muted);font-size:12.5px;margin:2px 0 0}
+    -webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:680px;margin:0 auto;padding:0 14px 90px}
+  header{position:sticky;top:0;z-index:20;background:var(--card);
+    border-bottom:1px solid var(--line);margin:0 -14px;
+    padding:env(safe-area-inset-top) 14px 0;box-shadow:0 1px 0 rgba(16,30,60,.03)}
+  .brand{display:flex;align-items:center;gap:11px;padding:12px 0 10px}
+  .logo{width:34px;height:34px;border-radius:9px;box-shadow:var(--shadow);flex:0 0 auto}
+  .wordmark{font-size:19px;font-weight:800;letter-spacing:-.01em;color:var(--brand-ink);line-height:1.05}
+  .sub{color:var(--muted);font-size:12px;margin:1px 0 0}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-    padding:14px;margin:12px 0}
-  label{font-size:13px;font-weight:600;display:block;margin:0 0 6px}
+    padding:16px;margin:14px 0;box-shadow:var(--shadow)}
+  label{font-size:12.5px;font-weight:700;display:block;margin:0 0 6px;letter-spacing:.01em}
   .row{display:flex;gap:8px}
   .row>div{flex:1}
-  input,textarea,select{width:100%;background:var(--bg);color:var(--ink);
-    border:1px solid var(--line);border-radius:10px;padding:10px 11px;font-size:15px;
-    font-family:inherit}
+  input,textarea,select{width:100%;background:var(--field);color:var(--ink);
+    border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:15px;
+    font-family:inherit;transition:border-color .15s,box-shadow .15s}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand);
+    box-shadow:0 0 0 3px rgba(31,95,222,.16)}
   textarea{min-height:150px;resize:vertical;line-height:1.4}
   textarea.edit{min-height:320px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px}
   .hint{font-size:12px;color:var(--muted);margin:6px 0 0}
   button{font-family:inherit;font-size:15px;font-weight:600;border:0;border-radius:11px;
-    padding:12px 14px;cursor:pointer}
-  .btn{background:var(--brand);color:#fff;width:100%}
-  .btn:active{background:var(--brand-d)}
-  .btn[disabled]{opacity:.55;cursor:default}
-  .btn2{background:var(--chip);color:var(--ink);border:1px solid var(--line)}
+    padding:12px 14px;cursor:pointer;transition:background .15s,transform .05s,border-color .15s}
+  .btn{background:var(--brand);color:#fff;width:100%;box-shadow:0 2px 10px rgba(31,95,222,.28)}
+  .btn:hover{background:var(--brand-d)}
+  .btn:active{background:var(--brand-d);transform:translateY(1px)}
+  .btn[disabled]{opacity:.55;cursor:default;box-shadow:none}
+  .btn2{background:var(--chip);color:var(--brand-ink);border:1px solid var(--line)}
+  .btn2:hover{border-color:var(--brand)}
   .mic{flex:0 0 auto;width:50px;background:var(--chip);border:1px solid var(--line);color:var(--ink);font-size:18px}
   .mic.rec{background:var(--danger);color:#fff;border-color:var(--danger);animation:pulse 1s infinite}
   @keyframes pulse{50%{opacity:.6}}
   .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .actions button{flex:1;min-width:120px}
-  .tabs{display:flex;gap:6px;margin-top:6px}
-  .tab{flex:1;text-align:center;padding:9px 4px;border-radius:10px;background:transparent;
-    border:1px solid var(--line);color:var(--muted);font-weight:600;font-size:13.5px}
-  .tab.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .tabs{display:flex;gap:6px;padding-bottom:10px}
+  .tab{flex:1;text-align:center;padding:10px 4px;border-radius:10px;background:transparent;
+    border:1px solid var(--line);color:var(--muted);font-weight:700;font-size:13.5px;transition:all .15s}
+  .tab.on{background:var(--brand);color:#fff;border-color:var(--brand);box-shadow:0 2px 8px rgba(31,95,222,.25)}
   .seg{display:flex;gap:8px}
   .segbtn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
     border:1px solid var(--line);border-radius:10px;padding:10px;font-weight:600;
@@ -71,8 +80,8 @@
   .chip:active{background:var(--brand);color:#fff}
   .ata{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
     padding:16px 16px 4px;margin-top:12px}
-  .ata h1{font-size:21px;margin:2px 0 10px}
-  .ata h2{font-size:17px;margin:16px 0 6px}
+  .ata h1{font-size:21px;margin:2px 0 10px;color:var(--brand-ink);letter-spacing:-.01em}
+  .ata h2{font-size:16px;margin:16px 0 6px;color:var(--brand-ink)}
   .ata h3{font-size:14px;letter-spacing:.02em;text-transform:uppercase;color:var(--brand);
     margin:16px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
   .ata ul{margin:6px 0;padding-left:20px}
@@ -120,8 +129,13 @@
 <body>
 <div class="wrap">
   <header>
-    <h1><span class="dot"></span> Atas</h1>
-    <p class="sub">Gere a ata, peça ajustes ao Claude (texto ou voz) quantas vezes quiser, e envie.</p>
+    <div class="brand">
+      <img class="logo" src="icon-192.png" alt="Atas">
+      <div class="brandtext">
+        <div class="wordmark">Atas</div>
+        <div class="sub">Transcrição → ata ou resumo, com IA</div>
+      </div>
+    </div>
     <div class="tabs">
       <button class="tab on" id="tab-new" onclick="newAta()">Nova ata</button>
       <button class="tab" id="tab-terms" onclick="show('terms')">Memória</button>
