@@ -71,7 +71,8 @@
   .chip:active{background:var(--brand);color:#fff}
   .ata{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
     padding:16px 16px 4px;margin-top:12px}
-  .ata h2{font-size:18px;margin:2px 0 8px}
+  .ata h1{font-size:21px;margin:2px 0 10px}
+  .ata h2{font-size:17px;margin:16px 0 6px}
   .ata h3{font-size:14px;letter-spacing:.02em;text-transform:uppercase;color:var(--brand);
     margin:16px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
   .ata ul{margin:6px 0;padding-left:20px}
@@ -107,7 +108,8 @@
     @page{margin:16mm}
     header,#view-new,#view-terms,#view-hist{display:none!important}
     #print-area{display:block!important;color:#000;font-size:12pt;line-height:1.5}
-    #print-area h2{font-size:18pt;margin:0 0 6pt}
+    #print-area h1{font-size:20pt;margin:0 0 8pt}
+    #print-area h2{font-size:15pt;margin:12pt 0 4pt}
     #print-area h3{font-size:12pt;color:#1f6feb;text-transform:uppercase;
       border-bottom:1px solid #bbb;padding-bottom:2pt;margin:14pt 0 4pt}
     #print-area ul{padding-left:18pt} #print-area li{margin:3pt 0}
@@ -500,22 +502,34 @@ function genSystem(opts){
 - [conclusão ou encaminhamento; omita se não houver]`;
   } else {
     papel='Você cria ATAS de reunião em português do Brasil a partir de transcrições geradas por IA (com erros).';
-    fmt=`Formato da ata (Markdown, nesta ordem):
-## [Título da reunião]
-**Data:** [data]  ·  **Local:** [local]
-**Participantes:** [lista]
+    fmt=`Formato da ATA (Markdown). Siga EXATAMENTE esta estrutura:
+# Ata de Reunião
 
-### Resumo
-[panorama do que foi tratado]
+**TEMA:** [tema geral da reunião]
+- [subtema ou projeto tratado]
+- [outro subtema, se houver]
 
-### Pauta / Tópicos discutidos
-- [tópico e o que foi falado sobre ele]
+**PARTICIPANTES:** [nomes separados por vírgula]
 
-### Decisões
-- [decisão]
+**DATA:** [data] · **LOCAL:** [local]
 
-### Tarefas / Ações
-- [Ação] — **Responsável:** [nome] — **Prazo:** [data ou "a definir"]`;
+## Resumo
+[um ou mais parágrafos com o panorama; se houver vários blocos temáticos, pode enumerá-los: (1)..., (2)..., (3)...]
+
+## [Tópico ou Projeto tratado]
+### [Subtópico]
+- [ponto discutido, decisão ou detalhe relevante]
+
+(Crie um bloco "## " para CADA tópico/projeto tratado na reunião, com subtópicos em "### " e marcadores. Cubra todos os assuntos.)
+
+## Pontos Principais / Conclusões
+**[PROJETO/GRUPO]:**
+- [decisão ou conclusão consolidada]
+
+## Próximos Passos
+- [ação a executar] — [responsável, se identificado]
+
+Estrutura obrigatória: organize o miolo POR TÓPICO/PROJETO (cada um em "## "), com subtópicos em "### " e marcadores em "- ". Consolide as decisões em "Pontos Principais / Conclusões" agrupadas por projeto, e as ações em "Próximos Passos" citando o responsável quando aparecer.`;
   }
   return `${papel}
 
@@ -684,14 +698,21 @@ function mdToHtml(md){
   for(let ln of lines){
     if(/^###\s+/.test(ln)){closeList();html+='<h3>'+inline(ln.replace(/^###\s+/,''))+'</h3>';}
     else if(/^##\s+/.test(ln)){closeList();html+='<h2>'+inline(ln.replace(/^##\s+/,''))+'</h2>';}
+    else if(/^#\s+/.test(ln)){closeList();html+='<h1>'+inline(ln.replace(/^#\s+/,''))+'</h1>';}
     else if(/^[-*]\s+/.test(ln)){if(!inList){html+='<ul>';inList=true;}html+='<li>'+inline(ln.replace(/^[-*]\s+/,''))+'</li>';}
     else if(ln.trim()===''){closeList();}
     else{closeList();html+='<p>'+inline(ln)+'</p>';}
   }
   closeList();return html;
 }
-function mdToText(md){return md.replace(/^#{2,3}\s+/gm,'').replace(/\*\*(.+?)\*\*/g,'$1').trim();}
-function titleFromMd(md){const m=md.match(/^##\s+(.+)$/m);return m?m[1].trim():($('#f-title').value.trim()||'Ata de reunião');}
+function mdToText(md){return md.replace(/^#{1,6}\s+/gm,'').replace(/\*\*(.+?)\*\*/g,'$1').trim();}
+function titleFromMd(md){
+  const tema=md.match(/\*\*TEMA:\*\*\s*(.+)/i);
+  if(tema&&tema[1].trim())return tema[1].trim();
+  const h=md.match(/^#{1,3}\s+(.+)$/m);
+  if(h&&!/^ata de reuni/i.test(h[1].trim()))return h[1].trim();
+  return ($('#f-title')&&$('#f-title').value.trim())||'Ata de reunião';
+}
 
 // ---------- resultado / edição ----------
 function renderResultShell(allowSave){
@@ -703,6 +724,7 @@ function renderResultShell(allowSave){
       '<button class="btn" onclick="sendEmail()">📧 Enviar por e-mail</button>'+
       '<button class="btn2" onclick="editAta()">✏️ Editar manual</button>'+
       '<button class="btn2" onclick="makePdf()">📄 PDF</button>'+
+      '<button class="btn2" onclick="makeWord()">📝 Word</button>'+
       '<button class="btn2" onclick="copyAta()">Copiar</button>'+
       (allowSave?'<button class="btn2" onclick="saveCurrent()">Salvar</button>':'')+
     '</div>'+
@@ -792,11 +814,24 @@ function makePdf(){
   document.title=(current.title||'Ata');
   setTimeout(()=>window.print(),60);
 }
+function makeWord(){
+  if(!current)return;
+  const body=mdToHtml(current.md);
+  const html='<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" '+
+    'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
+    '<head><meta charset="utf-8"><title>'+esc(current.title||'Ata')+'</title>'+
+    '<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#000;line-height:1.4}'+
+    'h1{font-size:18pt;margin:0 0 8pt} h2{font-size:14pt;color:#1f3a8a;margin:12pt 0 4pt} '+
+    'h3{font-size:12pt;color:#1f6feb;margin:10pt 0 3pt} ul{margin:2pt 0 8pt 0} li{margin:2pt 0} p{margin:5pt 0}'+
+    '</style></head><body>'+body+'</body></html>';
+  const name=(current.title||'Ata').replace(/[\\/:*?"<>|]/g,'-').slice(0,80)+'.doc';
+  dl('﻿'+html,'application/msword',name);
+}
 function toast(m){const s=$('#status2');if(s){s.className='status ok';s.textContent=m;}}
 
 // ---------- histórico ----------
 function extractResumo(md){
-  const m=md.match(/###\s*Resumo\s*\n+([\s\S]*?)(\n\s*###|\n\s*##|$)/i);
+  const m=md.match(/#{1,3}\s*Resumo\s*\n+([\s\S]*?)(\n\s*#{1,3}\s|$)/i);
   if(m){const first=m[1].trim().split('\n').map(s=>s.trim()).filter(Boolean)[0];return first||'';}
   return '';
 }
